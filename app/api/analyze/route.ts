@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { localAnalyze } from '@/lib/analyze';
+import { localAnalyze } from '../../../lib/analyze';
 
 const system = `Sos un analista alimentario. Dado el texto de ingredientes o una foto de etiqueta,
 extraé ingredientes, alérgenos (gluten, lácteos), y devolvé un JSON con:
-{ hasGluten, glutenOrigin, hasLactose, crossContam, pros[], cons[], score (1-10), summary }.
+{ hasGluten, glutenOrigin, hasLactose, crossContam, pros[], cons[], score (1–10), summary }.
 Identificá contaminación cruzada si hay frases tipo "puede contener". El score es orientativo.`;
 
 export async function POST(req: Request) {
