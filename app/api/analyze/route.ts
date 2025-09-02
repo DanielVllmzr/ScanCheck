@@ -2,13 +2,19 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { localAnalyze } from '../../../lib/analyze';
 
+// 🔧 Fuerza Node.js (el SDK de OpenAI no corre en Edge)
+export const runtime = 'nodejs';
+// 🔧 Evita caché en esta ruta
+export const dynamic = 'force-dynamic';
+
 const system = `Sos un analista alimentario. Dado el texto de ingredientes o una foto de etiqueta,
 extraé ingredientes, alérgenos (gluten, lácteos), y devolvé un JSON con:
 { hasGluten, glutenOrigin, hasLactose, crossContam, pros[], cons[], score (1–10), summary }.
 Identificá contaminación cruzada si hay frases tipo "puede contener". El score es orientativo.`;
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}));
+  let body: any = {};
+  try { body = await req.json(); } catch {}
   const { imageBase64, text } = body || {};
   const apiKey = process.env.OPENAI_API_KEY;
 
@@ -28,9 +34,7 @@ export async function POST(req: Request) {
           { type: 'text', text: 'Extrae el texto y analiza alérgenos como gluten y lactosa. Devolvé SOLO el JSON pedido.' },
           {
             type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${imageBase64}`
-            }
+            image_url: { url: `data:image/jpeg;base64,${imageBase64}` }
           }
         ]
       } as any);
@@ -52,11 +56,8 @@ export async function POST(req: Request) {
 
     const content = resp.choices[0]?.message?.content || '{}';
     let parsed: any;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      parsed = localAnalyze(text || '');
-    }
+    try { parsed = JSON.parse(content); }
+    catch { parsed = localAnalyze(text || ''); }
 
     // Normalización mínima
     if (typeof parsed.score !== 'number') parsed.score = 5;
@@ -69,7 +70,8 @@ export async function POST(req: Request) {
     if (!('glutenOrigin' in parsed)) parsed.glutenOrigin = null;
 
     return NextResponse.json(parsed);
-  } catch (e) {
-    return NextResponse.json(localAnalyze(text || ''));
+  } catch (e: any) {
+    // Devuelvo info de error para que el front pueda mostrar algo útil
+    return NextResponse.json({ error: String(e), ...localAnalyze(text || '') });
   }
 }
