@@ -12,14 +12,9 @@ export async function POST(req: Request) {
   const { imageBase64, text } = body || {};
   const apiKey = process.env.OPENAI_API_KEY;
 
-  // Si no hay API key o viene solo texto, usar heurística local
-  if (!apiKey && text) {
-    const out = localAnalyze(text as string);
-    return NextResponse.json(out);
-  }
-  if (!apiKey && imageBase64) {
-    return NextResponse.json(localAnalyze(""));
-  }
+  // Sin API key: heurística local (demo)
+  if (!apiKey && text) return NextResponse.json(localAnalyze(text as string));
+  if (!apiKey && imageBase64) return NextResponse.json(localAnalyze(""));
 
   try {
     const openai = new OpenAI({ apiKey: apiKey! });
@@ -31,14 +26,19 @@ export async function POST(req: Request) {
         role: 'user',
         content: [
           { type: 'text', text: 'Extrae el texto y analiza alérgenos como gluten y lactosa. Devolvé SOLO el JSON pedido.' },
-          { type: 'input_image', image_url: `data:image/jpeg;base64,${imageBase64}` },
-        ],
-      });
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:image/jpeg;base64,${imageBase64}`
+            }
+          }
+        ]
+      } as any);
     } else if (text) {
       messages.push({
         role: 'user',
-        content: [{ type: 'text', text: `Texto de etiqueta:\n${text}\n\nDevolvé SOLO el JSON pedido.` }],
-      });
+        content: [{ type: 'text', text: `Texto de etiqueta:\n${text}\n\nDevolvé SOLO el JSON pedido.` }]
+      } as any);
     } else {
       return NextResponse.json(localAnalyze(''));
     }
@@ -47,12 +47,18 @@ export async function POST(req: Request) {
       model: 'gpt-4o-mini',
       messages,
       response_format: { type: 'json_object' },
-      temperature: 0.2,
+      temperature: 0.2
     });
 
     const content = resp.choices[0]?.message?.content || '{}';
     let parsed: any;
-    try { parsed = JSON.parse(content); } catch { parsed = localAnalyze(text || ''); }
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      parsed = localAnalyze(text || '');
+    }
+
+    // Normalización mínima
     if (typeof parsed.score !== 'number') parsed.score = 5;
     if (!Array.isArray(parsed.pros)) parsed.pros = [];
     if (!Array.isArray(parsed.cons)) parsed.cons = [];
@@ -64,7 +70,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(parsed);
   } catch (e) {
-    const out = localAnalyze(text || '');
-    return NextResponse.json(out);
+    return NextResponse.json(localAnalyze(text || ''));
   }
 }
