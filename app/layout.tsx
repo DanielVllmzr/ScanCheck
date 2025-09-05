@@ -1,21 +1,22 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
-  title: "Scan&Check — Gluten/Lactosa",
-  description: "Escaneá etiquetas y detectá gluten/lactosa en tiempo real",
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    viewportFit: "cover",
-  },
-  themeColor: "#a16207"
+  title: "Scan&Check",
+  description: "Gluten & Lactosa — Demo",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className="min-h-screen">{children}</body>
+      <body className={`${inter.variable} font-sans bg-background text-foreground`}>{children}</body>
     </html>
   );
 }
