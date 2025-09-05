@@ -101,12 +101,12 @@ export default function ScanCheck() {
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             {/* Logo sin fondo (NextImage) */}
-            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner border border-border bg-transparent">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner border border-border bg-transparent">
               <NextImage
                 src="/logo-transparent.png"
                 alt="Scan&Check"
-                width={32}
-                height={32}
+                width={36}
+                height={36}
                 priority
               />
             </div>
