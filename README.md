@@ -49,3 +49,6 @@ public/
 ## 🤝 Notas
 - El score es orientativo y no reemplaza consejo médico.
 - Ajustá los detectores en `lib/analyze.ts` para nuevos idiomas/regiones.
+
+- OCR local con Tesseract.js (sin costo). Para Vision, configurar OPENAI_API_KEY.
+
