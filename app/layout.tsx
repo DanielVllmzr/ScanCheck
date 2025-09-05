@@ -11,21 +11,33 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Scan&Check",
   description: "Gluten & Lactosa — Demo",
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" }
+    ],
+    apple: { url: "/apple-touch-icon.png", sizes: "180x180" }
+  },
+  themeColor: "#f4b400"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
       <head>
+        {/* PWA manifest */}
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#f4b400" />
         {/* iOS PWA */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Scan&Check" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        {/* Color barra del navegador */}
+        <meta name="theme-color" content="#f4b400" />
       </head>
-      <body className={`${inter.variable} font-sans bg-background text-foreground`}>{children}</body>
+      <body className={`${inter.variable} font-sans bg-background text-foreground`}>
+        {children}
+      </body>
     </html>
   );
 }
