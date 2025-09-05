@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
   Upload,
   RefreshCw,
   RefreshCcw, // ↻ indicador pull-to-refresh
-  Sparkles,
   Check,
   X,
   WheatOff,
@@ -100,8 +100,15 @@ export default function ScanCheck() {
         {/* Header */}
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-brand-100 flex items-center justify-center shadow-inner border border-border">
-              <Sparkles className="w-5 h-5 text-brand-600" />
+            {/* Logo sin fondo, sobre el fondo existente (sin círculo) */}
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner border border-border bg-transparent">
+              <Image
+                src="/logo-transparent.png"
+                alt="Scan&Check"
+                width={28}
+                height={28}
+                priority
+              />
             </div>
             <div>
               <h1 className="h1">Scan&Check</h1>
