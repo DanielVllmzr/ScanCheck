@@ -227,7 +227,7 @@ export default function ScanCheck() {
                   initial={{ width: 0 }}
                   animate={{ width: `${(result.score / 10) * 100}%` }}
                   transition={{ type: 'spring', stiffness: 120, damping: 18 }}
-                  className="h-full bg-gradient-to-r from-success-500 via-brand-400 to-danger-500"
+                  className="h-full bg-gradient-to-r from-danger-500 via-brand-400 to-success-500"
                 />
               </div>
             </div>
