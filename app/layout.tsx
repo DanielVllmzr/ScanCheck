@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Image from "next/image";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -48,7 +49,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#f4b400" />
       </head>
       <body className={`${inter.variable} font-sans bg-background text-foreground`}>
-        {children}
+        {/* Header superior con el logo SIN fondo/círculo */}
+        <header className="w-full bg-brand-500 px-4 py-3">
+          <div className="max-w-6xl mx-auto flex items-center gap-3">
+            {/* Logo transparente sobre el fondo existente */}
+            <Image
+              src="/logo-transparent.png"
+              alt="Scan&Check"
+              width={32}
+              height={32}
+              priority
+            />
+            <div className="flex flex-col leading-tight">
+              <h1 className="text-lg font-bold text-gray-900">Scan&Check</h1>
+              <p className="text-sm text-gray-800">Gluten & Lactosa — Foto única (OCR local)</p>
+            </div>
+          </div>
+        </header>
+
+        {/* Contenido */}
+        <main className="min-h-screen">
+          {children}
+        </main>
       </body>
     </html>
   );
