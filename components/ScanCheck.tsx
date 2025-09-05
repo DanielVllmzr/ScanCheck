@@ -126,19 +126,21 @@ export default function ScanCheck() {
             </div>
 
             {/* Botones grandes centrados y parejos */}
-            <div className="flex flex-wrap justify-center items-center gap-3 mb-5">
-              <button onClick={handleTakePhoto} className="btn btn-brand rounded-2xl min-w-[160px] justify-center">
-                <Camera className="w-5 h-5" /> Tomar foto
-              </button>
-              <button onClick={handleUploadPhoto} className="btn btn-outline rounded-2xl min-w-[160px] justify-center">
-                <Upload className="w-5 h-5" /> Subir foto
-              </button>
-              {previewDataUrl && (
-                <button onClick={resetPhoto} className="btn btn-outline rounded-2xl min-w-[160px] justify-center">
-                  <RefreshCw className="w-5 h-5" /> Tomar otra
-                </button>
-              )}
-            </div>
+            <div className="flex gap-3 mb-5">
+  <button
+    onClick={handleTakePhoto}
+    className="btn btn-brand rounded-2xl w-1/2 justify-center py-4 text-base"
+  >
+    <Camera className="w-5 h-5" /> Tomar foto
+  </button>
+  <button
+    onClick={handleUploadPhoto}
+    className="btn btn-outline rounded-2xl w-1/2 justify-center py-4 text-base"
+  >
+    <Upload className="w-5 h-5" /> Subir foto
+  </button>
+</div>
+
 
             {/* Vista previa */}
             <div className={`overflow-hidden rounded-2xl border ${previewDataUrl ? 'border-success-300' : 'border-border'}`}>
