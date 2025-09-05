@@ -105,8 +105,8 @@ export default function ScanCheck() {
               <NextImage
                 src="/logo-transparent.png"
                 alt="Scan&Check"
-                width={28}
-                height={28}
+                width={32}
+                height={32}
                 priority
               />
             </div>
