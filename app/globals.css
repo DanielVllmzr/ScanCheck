@@ -40,3 +40,10 @@ body {
 .h1 { @apply text-2xl md:text-3xl font-bold; }
 .h2 { @apply text-lg font-semibold; }
 .subtle { @apply text-sm text-muted; }
+
+html, body {
+  height: 100%;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* evita el efecto rebote doble */
+}
+
