@@ -1,35 +1,19 @@
 'use client';
+
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Sparkles, Info, ShieldAlert, CheckCircle2, XCircle, WheatOff, MilkOff, Upload, RefreshCw } from 'lucide-react';
+// Usamos mayormente lucide-react (estilo Feather). Si faltara algún icono puntual, se puede sumar otro set.
+import { Camera, Upload, RefreshCw, Sparkles, Info, Check, X, WheatOff, MilkOff, FileText } from 'lucide-react';
 import { localAnalyze, type AnalyzeOutput } from '@/lib/analyze';
 import { ocrImageDataUrl } from '@/lib/ocr';
 
-const panel = "bg-stone-100 border border-stone-300 rounded-2xl shadow-sm";
-const heading = "text-stone-800 font-semibold";
-const chip = "px-2 py-0.5 rounded-full text-xs border";
-
-function Pill({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span className={`${chip} ${ok ? "bg-green-50 border-green-300 text-green-700" : "bg-rose-50 border-rose-300 text-rose-700"}`}>
-      {ok ? (
-        <span className="inline-flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {label}</span>
-      ) : (
-        <span className="inline-flex items-center gap-1"><XCircle className="w-3 h-3" /> {label}</span>
-      )}
-    </span>
-  );
-}
-function Badge({ icon: Icon, text }: { icon: any; text: string }) {
-  return (
-    <span className={`${chip} border-stone-300 text-stone-600 bg-stone-100 inline-flex items-center gap-1`}>
-      <Icon className="w-3 h-3" /> {text}
-    </span>
-  );
+function scoreColor(score: number) {
+  if (score >= 8) return "bg-success-500 text-white";
+  if (score >= 5) return "bg-brand-400 text-white";
+  return "bg-danger-500 text-white";
 }
 
 export default function ScanCheck() {
-  // OCR local (sin API)
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AnalyzeOutput>(localAnalyze(""));
@@ -53,10 +37,9 @@ export default function ScanCheck() {
     try {
       const text = await ocrImageDataUrl(resized, (p) => setProgress(Math.round(p * 100)));
       setLastOcrText(text);
-      const analyzed = localAnalyze(text);
-      setResult(analyzed);
+      setResult(localAnalyze(text));
     } catch (e) {
-      alert("No se pudo leer el texto de la foto. Probá con mejor luz y encuadre, y enfocá SOLO el bloque de ingredientes.");
+      alert("No se pudo leer el texto de la foto. Probá con mejor luz, acercate y enfocá SOLO el bloque de ingredientes.");
     } finally {
       setBusy(false);
     }
@@ -69,169 +52,222 @@ export default function ScanCheck() {
     setResult(localAnalyze(""));
   };
 
+  const stickyLabel = previewDataUrl || lastOcrText ? "Escanear otro" : "Escanear nuevo producto";
+  const stickyAction = () => (previewDataUrl ? resetPhoto() : handleTakePhoto());
+
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-800">
+    <div className="min-h-screen">
       <div className="max-w-6xl mx-auto p-4 md:p-8">
+        {/* Header */}
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-200 flex items-center justify-center shadow-inner">
-              <Sparkles className="w-5 h-5 text-amber-700" />
+            <div className="w-10 h-10 rounded-2xl bg-brand-100 flex items-center justify-center shadow-inner border border-border">
+              <Sparkles className="w-5 h-5 text-brand-600" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-stone-800">Scan&Check</h1>
-              <p className="text-sm text-stone-500">Gluten & Lactosa — Foto única (OCR local)</p>
+              <h1 className="h1">Scan&Check</h1>
+              <p className="subtle">Gluten & Lactosa — Foto única (OCR local)</p>
             </div>
           </div>
         </header>
 
+        {/* Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Izquierda: foto */}
-          <section className={`${panel} p-4 md:p-6`}>
+          {/* Entrada */}
+          <section className="card p-4 md:p-6">
             <div className="flex items-center justify-between mb-3">
-              <h2 className={`${heading}`}>Entrada</h2>
-              <div className="flex items-center gap-2 text-xs">
-                <Badge icon={Info} text="Tomá o subí una foto del bloque de ingredientes" />
+              <h2 className="h2">Entrada</h2>
+              <div className="subtle inline-flex items-center gap-1">
+                <Info className="w-4 h-4" />
+                Subí o tomá una foto del bloque de ingredientes
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 mb-4">
-              <button onClick={handleTakePhoto} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300">
-                <Camera className="w-4 h-4" /> Tomar foto
+            {/* Botones grandes */}
+            <div className="flex flex-wrap gap-3 mb-5">
+              <button onClick={handleTakePhoto} className="btn btn-brand rounded-2xl">
+                <Camera className="w-5 h-5" /> Tomar foto
               </button>
-              <button onClick={handleUploadPhoto} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300">
-                <Upload className="w-4 h-4" /> Subir foto
+              <button onClick={handleUploadPhoto} className="btn btn-outline rounded-2xl">
+                <Upload className="w-5 h-5" /> Subir foto
               </button>
               {previewDataUrl && (
-                <button onClick={resetPhoto} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-stone-700 border-stone-300">
-                  <RefreshCw className="w-4 h-4" /> Tomar otra
+                <button onClick={resetPhoto} className="btn btn-outline rounded-2xl">
+                  <RefreshCw className="w-5 h-5" /> Tomar otra
                 </button>
               )}
             </div>
 
-            {/* inputs ocultos */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) await onImagePicked(f);
-              }}
-            />
-            <input
-              ref={uploadInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) await onImagePicked(f);
-              }}
-            />
-
-            {/* preview */}
-            <div className={`overflow-hidden rounded-2xl border ${previewDataUrl ? "border-green-600" : "border-stone-300"}`}>
-              <div className="relative aspect-video bg-stone-200 flex items-center justify-center">
+            {/* Vista previa */}
+            <div className={`overflow-hidden rounded-2xl border ${previewDataUrl ? "border-success-300" : "border-border"}`}>
+              <div className="relative aspect-video bg-white flex items-center justify-center">
                 {previewDataUrl ? (
                   <img src={previewDataUrl} alt="foto etiqueta" className="w-full h-full object-contain" />
                 ) : (
-                  <div className="p-6 text-center space-y-3">
-                    <p className="text-stone-600">
-                      Tomá o subí una foto del <span className="font-medium">bloque de ingredientes / alérgenos</span>.
+                  <div className="p-8 text-center space-y-3">
+                    <p className="text-muted">
+                      Tomá o subí una foto del <span className="font-medium text-foreground">bloque de ingredientes / alérgenos</span>.
                     </p>
                     <div className="flex gap-2 items-center justify-center text-xs">
-                      <Badge icon={WheatOff} text="Detecta gluten" />
-                      <Badge icon={MilkOff} text="Detecta lactosa" />
+                      <span className="chip"><WheatOff className="w-3 h-3" /> Detecta gluten</span>
+                      <span className="chip"><MilkOff className="w-3 h-3" /> Detecta lactosa</span>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* progreso OCR */}
+            {/* Progreso OCR */}
             {busy && (
-              <div className="mt-3 text-xs text-stone-600">
-                Analizando foto (OCR)… {progress}%
-              </div>
+              <div className="mt-3 text-xs text-muted">Analizando foto (OCR)… {progress}%</div>
             )}
 
-            {/* ingredientes detectados - solo lectura */}
-            <div className="mt-4">
-              <label className="text-sm block mb-1">Ingredientes detectados (OCR)</label>
-              <textarea
-                className="w-full h-40 border border-stone-300 bg-white rounded-xl p-3 text-sm"
-                placeholder="Todavía no hay texto detectado. Tomá o subí una foto del bloque de ingredientes."
-                value={lastOcrText}
-                readOnly
-              />
-              <p className="text-xs text-stone-500 mt-1">Si el texto no coincide, tomá otra foto más cerca y con buena luz.</p>
+            {/* Ingredientes detectados (solo lectura con placeholder bonito) */}
+            <div className="mt-5">
+              <label className="text-sm font-semibold text-foreground mb-1 block">Ingredientes detectados (OCR)</label>
+              <div className="relative">
+                {lastOcrText ? (
+                  <textarea
+                    className="w-full h-40 bg-white border border-border rounded-2xl p-3 text-sm"
+                    value={lastOcrText}
+                    readOnly
+                  />
+                ) : (
+                  <div className="w-full h-40 bg-white border border-border rounded-2xl p-3 text-sm text-muted flex items-center">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>El texto detectado aparecerá aquí luego de tomar la foto.</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-muted mt-1">Si el texto no coincide, tomá otra foto más cerca y con buena luz.</p>
             </div>
           </section>
 
-          {/* Derecha: resultados */}
-          <section className={`${panel} p-4 md:p-6`}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className={`${heading}`}>Resultado del análisis</h2>
-              <div className="flex gap-2">
-                <Pill ok={!result.hasGluten && !result.crossContam} label={result.hasGluten ? "Con gluten" : result.crossContam ? "Riesgo de gluten" : "Sin gluten"} />
-                <Pill ok={!result.hasLactose} label={result.hasLactose ? "Con lactosa" : "Sin lactosa"} />
+          {/* Resultado del análisis */}
+          <section className="card p-4 md:p-6">
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="h2">Resultado del análisis</h2>
+              {/* Badge circular grande con color por score */}
+              <div className={`shrink-0 rounded-full ${scoreColor(result.score)} w-14 h-14 grid place-items-center shadow-soft`}>
+                <span className="text-base font-bold">{result.score}/10</span>
               </div>
             </div>
 
-            <div className="mb-4">
-              <div className="flex items-end justify-between">
-                <span className="text-sm text-stone-500">Salud del producto</span>
-                <span className="text-lg font-semibold text-stone-800">{result.score}/10</span>
+            {/* Chips gluten/lactosa */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="chip">
+                {(!result.hasGluten && !result.crossContam) ? <Check className="w-3 h-3 text-success-500" /> : <X className="w-3 h-3 text-danger-500" />}
+                {result.hasGluten ? "Con gluten" : result.crossContam ? "Riesgo de gluten" : "Sin gluten"}
+              </span>
+              <span className="chip">
+                {!result.hasLactose ? <Check className="w-3 h-3 text-success-500" /> : <X className="w-3 h-3 text-danger-500" />}
+                {result.hasLactose ? "Con lactosa" : "Sin lactosa"}
+              </span>
+            </div>
+
+            {/* Barra estilo degradado */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between">
+                <span className="subtle">Salud del producto</span>
               </div>
-              <div className="w-full h-3 bg-stone-200 rounded-full mt-2 overflow-hidden">
+              <div className="w-full h-3 bg-white border border-border rounded-full mt-2 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${(result.score / 10) * 100}%` }}
                   transition={{ type: "spring", stiffness: 120, damping: 18 }}
-                  className="h-full bg-green-600"
+                  className="h-full bg-gradient-to-r from-success-500 via-brand-400 to-danger-500"
                 />
               </div>
             </div>
 
+            {/* Summary animado */}
             <AnimatePresence mode="popLayout">
               <motion.div
                 key={result.summary}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
-                className="rounded-xl bg-amber-100 border border-amber-300 p-3 text-sm text-amber-900 mb-4"
+                className="rounded-xl bg-brand-50 border border-border p-3 text-sm text-foreground mb-4"
               >
                 {result.summary}
               </motion.div>
             </AnimatePresence>
 
+            {/* Pros / Contras como chips dentro de cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-white border border-stone-200 p-4">
-                <h3 className="font-medium text-stone-800 mb-2 inline-flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> Pros</h3>
+              <div className="bg-white border border-border rounded-2xl p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2"><Check className="w-4 h-4 text-success-500" /> Pros</h3>
                 {result.pros.length ? (
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-stone-700">
-                    {result.pros.map((p, i) => (<li key={i}>{p}</li>))}
-                  </ul>
-                ) : (<p className="text-sm text-stone-500">Sin pros destacados.</p>)}
+                  <div className="flex flex-wrap gap-2">
+                    {result.pros.map((p, i) => (
+                      <span key={i} className="chip">{p}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted flex items-center gap-2">
+                    <Check className="w-4 h-4 opacity-60" /> Sin pros destacados.
+                  </div>
+                )}
               </div>
-              <div className="rounded-2xl bg-white border border-stone-200 p-4">
-                <h3 className="font-medium text-stone-800 mb-2 inline-flex items-center gap-2"><ShieldAlert className="w-4 h-4"/> Contras</h3>
+
+              <div className="bg-white border border-border rounded-2xl p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2"><X className="w-4 h-4 text-danger-500" /> Contras</h3>
                 {result.cons.length ? (
-                  <ul className="list-disc pl-5 space-y-1 text-sm text-stone-700">
-                    {result.cons.map((c, i) => (<li key={i}>{c}</li>))}
-                  </ul>
-                ) : (<p className="text-sm text-stone-500">Sin contras destacadas.</p>)}
+                  <div className="flex flex-wrap gap-2">
+                    {result.cons.map((c, i) => (
+                      <span key={i} className="chip">{c}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted flex items-center gap-2">
+                    <X className="w-4 h-4 opacity-60" /> Sin contras destacadas.
+                  </div>
+                )}
               </div>
             </div>
           </section>
         </div>
-
-        <footer className="mt-8 text-xs text-stone-500">
-          <p>Tip: en iPhone el botón “Tomar foto” usa la cámara trasera (<code>capture="environment"</code>). Apuntá SOLO al bloque de ingredientes/alérgenos y evitá brillos.</p>
-        </footer>
       </div>
+
+      {/* Botón sticky inferior (dinámico) */}
+      <div className="fixed inset-x-0 bottom-0 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pointer-events-none">
+        <div className="max-w-6xl mx-auto">
+          <div className="pointer-events-auto">
+            <button
+              onClick={stickyAction}
+              className="btn btn-brand w-full rounded-2xl shadow-soft"
+            >
+              <Camera className="w-5 h-5" />
+              {stickyLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* inputs ocultos */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          if (f) await onImagePicked(f);
+        }}
+      />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          if (f) await onImagePicked(f);
+        }}
+      />
     </div>
   );
 }
