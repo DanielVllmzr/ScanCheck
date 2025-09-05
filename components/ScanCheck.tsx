@@ -9,30 +9,6 @@ const panel = "bg-stone-100 border border-stone-300 rounded-2xl shadow-sm";
 const heading = "text-stone-800 font-semibold";
 const chip = "px-2 py-0.5 rounded-full text-xs border";
 
-const DEMO_PRODUCTS: Record<string, { label: string; text: string }> = {
-  none: { label: "—", text: "" },
-  granola: {
-    label: "Granola con avena y miel",
-    text: "INGREDIENTES: Avena integral, miel, almendras, aceite de girasol, pasas, sal marina, canela. Puede contener trazas de trigo, maní y leche. Sin colorantes artificiales."
-  },
-  galletas: {
-    label: "Galletas de trigo y chocolate",
-    text: "INGREDIENTES: Harina de trigo enriquecida (trigo), azúcar, aceite vegetal, cacao, leche en polvo, emulsionantes, sal, saborizante. Contiene GLUTEN y LECHE."
-  },
-  yogurt: {
-    label: "Yogurt natural bajo en grasa",
-    text: "INGREDIENTES: Leche pasteurizada, cultivos lácticos activos, pectina. Sin gluten. Puede contener trazas de soya. 10g proteína por porción."
-  },
-  salsa: {
-    label: "Salsa de soya (tradicional)",
-    text: "INGREDIENTES: Agua, soya, trigo, sal. Contiene trigo (gluten)."
-  },
-  cerveza: {
-    label: "Cerveza lager",
-    text: "INGREDIENTES: Agua, cebada malteada, lúpulo, levadura. Contiene cebada (gluten)."
-  },
-};
-
 function Pill({ ok, label }: { ok: boolean; label: string }) {
   return (
     <span className={`${chip} ${ok ? "bg-green-50 border-green-300 text-green-700" : "bg-rose-50 border-rose-300 text-rose-700"}`}>
@@ -53,8 +29,7 @@ function Badge({ icon: Icon, text }: { icon: any; text: string }) {
 }
 
 export default function ScanCheck() {
-  // OCR local ON por defecto
-  const [useLocalOCR, setUseLocalOCR] = useState(true);
+  // OCR local (sin API)
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AnalyzeOutput>(localAnalyze(""));
@@ -63,19 +38,6 @@ export default function ScanCheck() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Demo manual
-  const [demoKey, setDemoKey] = useState<keyof typeof DEMO_PRODUCTS>("granola");
-  const [manualText, setManualText] = useState(DEMO_PRODUCTS["granola"].text);
-
-  const handleSelectDemo = (k: keyof typeof DEMO_PRODUCTS) => {
-    setDemoKey(k);
-    setManualText(DEMO_PRODUCTS[k].text);
-    const analyzed = localAnalyze(DEMO_PRODUCTS[k].text);
-    setResult(analyzed);
-    setPreviewDataUrl(null);
-    setLastOcrText("");
-  };
 
   const handleTakePhoto = () => fileInputRef.current?.click();
   const handleUploadPhoto = () => uploadInputRef.current?.click();
@@ -87,19 +49,16 @@ export default function ScanCheck() {
     setLastOcrText("");
     setProgress(0);
 
-    // OCR local (sin costos)
-    if (useLocalOCR) {
-      setBusy(true);
-      try {
-        const text = await ocrImageDataUrl(resized, (p) => setProgress(Math.round(p * 100)));
-        setLastOcrText(text);
-        const analyzed = localAnalyze(text);
-        setResult(analyzed);
-      } catch (e) {
-        alert("No se pudo leer el texto de la foto. Probá con mejor luz y encuadre.");
-      } finally {
-        setBusy(false);
-      }
+    setBusy(true);
+    try {
+      const text = await ocrImageDataUrl(resized, (p) => setProgress(Math.round(p * 100)));
+      setLastOcrText(text);
+      const analyzed = localAnalyze(text);
+      setResult(analyzed);
+    } catch (e) {
+      alert("No se pudo leer el texto de la foto. Probá con mejor luz y encuadre, y enfocá SOLO el bloque de ingredientes.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -123,25 +82,15 @@ export default function ScanCheck() {
               <p className="text-sm text-stone-500">Gluten & Lactosa — Foto única (OCR local)</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <label className="text-xs text-stone-500 flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={useLocalOCR}
-                onChange={e => setUseLocalOCR(e.target.checked)}
-              />
-              Usar OCR local (sin API)
-            </label>
-          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Izquierda: foto + demo */}
+          {/* Izquierda: foto */}
           <section className={`${panel} p-4 md:p-6`}>
             <div className="flex items-center justify-between mb-3">
               <h2 className={`${heading}`}>Entrada</h2>
               <div className="flex items-center gap-2 text-xs">
-                <Badge icon={Info} text="Subí o tomá una foto del bloque de ingredientes" />
+                <Badge icon={Info} text="Tomá o subí una foto del bloque de ingredientes" />
               </div>
             </div>
 
@@ -201,49 +150,23 @@ export default function ScanCheck() {
               </div>
             </div>
 
-            {/* progreso OCR + texto extraído (colapsable simple) */}
+            {/* progreso OCR */}
             {busy && (
               <div className="mt-3 text-xs text-stone-600">
                 Analizando foto (OCR)… {progress}%
               </div>
             )}
-            {lastOcrText && (
-              <div className="mt-3">
-                <details className="text-xs text-stone-600">
-                  <summary className="cursor-pointer">Texto detectado (OCR)</summary>
-                  <pre className="whitespace-pre-wrap bg-white border border-stone-200 rounded-xl p-2 mt-1">{lastOcrText}</pre>
-                </details>
-              </div>
-            )}
 
-            {/* demo manual */}
-            <div className="mt-4 grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm">Producto de ejemplo</label>
-                <select
-                  className="w-full border border-stone-300 bg-stone-100 rounded-xl px-3 py-2"
-                  value={demoKey}
-                  onChange={(e) => handleSelectDemo(e.target.value as keyof typeof DEMO_PRODUCTS)}
-                >
-                  {Object.entries(DEMO_PRODUCTS).map(([key, v]) => (
-                    <option key={key} value={key}>{v.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm">Texto de etiqueta / ingredientes (demo)</label>
-                <textarea
-                  className="w-full h-40 border border-stone-300 bg-white rounded-xl p-3 text-sm"
-                  placeholder="Pegá acá la lista de ingredientes…"
-                  value={manualText}
-                  onChange={(e) => {
-                    setManualText(e.target.value);
-                    setPreviewDataUrl(null);
-                    setLastOcrText("");
-                    setResult(localAnalyze(e.target.value));
-                  }}
-                />
-              </div>
+            {/* ingredientes detectados - solo lectura */}
+            <div className="mt-4">
+              <label className="text-sm block mb-1">Ingredientes detectados (OCR)</label>
+              <textarea
+                className="w-full h-40 border border-stone-300 bg-white rounded-xl p-3 text-sm"
+                placeholder="Todavía no hay texto detectado. Tomá o subí una foto del bloque de ingredientes."
+                value={lastOcrText}
+                readOnly
+              />
+              <p className="text-xs text-stone-500 mt-1">Si el texto no coincide, tomá otra foto más cerca y con buena luz.</p>
             </div>
           </section>
 
@@ -306,7 +229,7 @@ export default function ScanCheck() {
         </div>
 
         <footer className="mt-8 text-xs text-stone-500">
-          <p>Tip: en iPhone el botón “Tomar foto” usa la cámara trasera (<code>capture="environment"</code>). Apuntá SOLO al bloque de ingredientes para mejor OCR.</p>
+          <p>Tip: en iPhone el botón “Tomar foto” usa la cámara trasera (<code>capture="environment"</code>). Apuntá SOLO al bloque de ingredientes/alérgenos y evitá brillos.</p>
         </footer>
       </div>
     </div>
