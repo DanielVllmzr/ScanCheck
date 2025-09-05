@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Camera, Sparkles, Info, ShieldAlert, CheckCircle2, XCircle, WheatOff, MilkOff, Upload, RefreshCw } from 'lucide-react';
 import { localAnalyze, type AnalyzeOutput } from '@/lib/analyze';
+import { ocrImageDataUrl } from '@/lib/ocr';
 
 const panel = "bg-stone-100 border border-stone-300 rounded-2xl shadow-sm";
 const heading = "text-stone-800 font-semibold";
@@ -19,7 +20,7 @@ const DEMO_PRODUCTS: Record<string, { label: string; text: string }> = {
     text: "INGREDIENTES: Harina de trigo enriquecida (trigo), azúcar, aceite vegetal, cacao, leche en polvo, emulsionantes, sal, saborizante. Contiene GLUTEN y LECHE."
   },
   yogurt: {
-    label: "Yogur natural bajo en grasa",
+    label: "Yogurt natural bajo en grasa",
     text: "INGREDIENTES: Leche pasteurizada, cultivos lácticos activos, pectina. Sin gluten. Puede contener trazas de soya. 10g proteína por porción."
   },
   salsa: {
@@ -43,7 +44,6 @@ function Pill({ ok, label }: { ok: boolean; label: string }) {
     </span>
   );
 }
-
 function Badge({ icon: Icon, text }: { icon: any; text: string }) {
   return (
     <span className={`${chip} border-stone-300 text-stone-600 bg-stone-100 inline-flex items-center gap-1`}>
@@ -52,27 +52,14 @@ function Badge({ icon: Icon, text }: { icon: any; text: string }) {
   );
 }
 
-async function callAnalyzeAPI(payload: { imageBase64?: string; text?: string }): Promise<AnalyzeOutput | null> {
-  try {
-    const res = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error("API error");
-    return await res.json();
-  } catch (e) {
-    console.warn("API analyze failed, falling back to local heuristics.", e);
-    if (payload.text) return localAnalyze(payload.text);
-    return null;
-  }
-}
-
 export default function ScanCheck() {
-  const [useVision, setUseVision] = useState(true); // ON = manda la foto a /api/analyze
+  // OCR local ON por defecto
+  const [useLocalOCR, setUseLocalOCR] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AnalyzeOutput>(localAnalyze(""));
   const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+  const [lastOcrText, setLastOcrText] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -87,45 +74,39 @@ export default function ScanCheck() {
     const analyzed = localAnalyze(DEMO_PRODUCTS[k].text);
     setResult(analyzed);
     setPreviewDataUrl(null);
+    setLastOcrText("");
   };
 
-  // Tomar foto (iPhone abre cámara nativa)
-  const handleTakePhoto = () => {
-    fileInputRef.current?.click();
-  };
-
-  // Subir foto desde galería/archivos
-  const handleUploadPhoto = () => {
-    uploadInputRef.current?.click();
-  };
+  const handleTakePhoto = () => fileInputRef.current?.click();
+  const handleUploadPhoto = () => uploadInputRef.current?.click();
 
   const onImagePicked = async (file: File) => {
-    // Previsualizar
     const dataUrl = await fileToDataURL(file);
-    setPreviewDataUrl(dataUrl);
-
-    // Recortar tamaño máximo a ~1200px de ancho para menor payload
     const resized = await resizeImageDataUrl(dataUrl, 1200);
-    const base64 = resized.split(",")[1];
+    setPreviewDataUrl(resized);
+    setLastOcrText("");
+    setProgress(0);
 
-    if (useVision) {
-  setBusy(true);
-  const analyzed = await callAnalyzeAPI({ imageBase64: base64 });
-  setBusy(false);
-  if (analyzed) {
-    if ((analyzed as any).error) {
-      alert("⚠️ Error Vision: " + (analyzed as any).error);
-      console.log("🔎 Vision API error:", analyzed);
+    // OCR local (sin costos)
+    if (useLocalOCR) {
+      setBusy(true);
+      try {
+        const text = await ocrImageDataUrl(resized, (p) => setProgress(Math.round(p * 100)));
+        setLastOcrText(text);
+        const analyzed = localAnalyze(text);
+        setResult(analyzed);
+      } catch (e) {
+        alert("No se pudo leer el texto de la foto. Probá con mejor luz y encuadre.");
+      } finally {
+        setBusy(false);
+      }
     }
-    setResult(analyzed);
-  }
-} else {
-  setResult(localAnalyze(""));
-}
   };
 
   const resetPhoto = () => {
     setPreviewDataUrl(null);
+    setLastOcrText("");
+    setProgress(0);
     setResult(localAnalyze(""));
   };
 
@@ -139,19 +120,23 @@ export default function ScanCheck() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-stone-800">Scan&Check</h1>
-              <p className="text-sm text-stone-500">Gluten & Lactosa — Foto única (estable)</p>
+              <p className="text-sm text-stone-500">Gluten & Lactosa — Foto única (OCR local)</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <label className="text-xs text-stone-500 flex items-center gap-1">
-              <input type="checkbox" checked={useVision} onChange={e => setUseVision(e.target.checked)} />
-              Usar Vision API
+              <input
+                type="checkbox"
+                checked={useLocalOCR}
+                onChange={e => setUseLocalOCR(e.target.checked)}
+              />
+              Usar OCR local (sin API)
             </label>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Izquierda: Foto + Demo */}
+          {/* Izquierda: foto + demo */}
           <section className={`${panel} p-4 md:p-6`}>
             <div className="flex items-center justify-between mb-3">
               <h2 className={`${heading}`}>Entrada</h2>
@@ -160,36 +145,26 @@ export default function ScanCheck() {
               </div>
             </div>
 
-            {/* Controles de foto */}
             <div className="flex flex-wrap gap-2 mb-4">
-              <button
-                onClick={handleTakePhoto}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300"
-              >
+              <button onClick={handleTakePhoto} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300">
                 <Camera className="w-4 h-4" /> Tomar foto
               </button>
-              <button
-                onClick={handleUploadPhoto}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300"
-              >
+              <button onClick={handleUploadPhoto} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300">
                 <Upload className="w-4 h-4" /> Subir foto
               </button>
               {previewDataUrl && (
-                <button
-                  onClick={resetPhoto}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-stone-700 border-stone-300"
-                >
+                <button onClick={resetPhoto} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-stone-700 border-stone-300">
                   <RefreshCw className="w-4 h-4" /> Tomar otra
                 </button>
               )}
             </div>
 
-            {/* Inputs ocultos para iPhone */}
+            {/* inputs ocultos */}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"  // iPhone abre cámara trasera
+              capture="environment"
               className="hidden"
               onChange={async (e) => {
                 const f = e.target.files?.[0];
@@ -207,16 +182,15 @@ export default function ScanCheck() {
               }}
             />
 
-            {/* Preview de foto */}
+            {/* preview */}
             <div className={`overflow-hidden rounded-2xl border ${previewDataUrl ? "border-green-600" : "border-stone-300"}`}>
               <div className="relative aspect-video bg-stone-200 flex items-center justify-center">
                 {previewDataUrl ? (
-                  // Mostramos la foto elegida
                   <img src={previewDataUrl} alt="foto etiqueta" className="w-full h-full object-contain" />
                 ) : (
                   <div className="p-6 text-center space-y-3">
                     <p className="text-stone-600">
-                      Tomá o subí una foto del <span className="font-medium">bloque de ingredientes / alergénos</span>.
+                      Tomá o subí una foto del <span className="font-medium">bloque de ingredientes / alérgenos</span>.
                     </p>
                     <div className="flex gap-2 items-center justify-center text-xs">
                       <Badge icon={WheatOff} text="Detecta gluten" />
@@ -227,7 +201,22 @@ export default function ScanCheck() {
               </div>
             </div>
 
-            {/* Modo demo por texto */}
+            {/* progreso OCR + texto extraído (colapsable simple) */}
+            {busy && (
+              <div className="mt-3 text-xs text-stone-600">
+                Analizando foto (OCR)… {progress}%
+              </div>
+            )}
+            {lastOcrText && (
+              <div className="mt-3">
+                <details className="text-xs text-stone-600">
+                  <summary className="cursor-pointer">Texto detectado (OCR)</summary>
+                  <pre className="whitespace-pre-wrap bg-white border border-stone-200 rounded-xl p-2 mt-1">{lastOcrText}</pre>
+                </details>
+              </div>
+            )}
+
+            {/* demo manual */}
             <div className="mt-4 grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <label className="text-sm">Producto de ejemplo</label>
@@ -250,16 +239,15 @@ export default function ScanCheck() {
                   onChange={(e) => {
                     setManualText(e.target.value);
                     setPreviewDataUrl(null);
+                    setLastOcrText("");
                     setResult(localAnalyze(e.target.value));
                   }}
                 />
               </div>
             </div>
-
-            {busy && <div className="mt-3 text-xs text-stone-500">Analizando foto…</div>}
           </section>
 
-          {/* Derecha: Resultados */}
+          {/* Derecha: resultados */}
           <section className={`${panel} p-4 md:p-6`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className={`${heading}`}>Resultado del análisis</h2>
@@ -318,15 +306,14 @@ export default function ScanCheck() {
         </div>
 
         <footer className="mt-8 text-xs text-stone-500">
-          <p>Tip: en iPhone el botón “Tomar foto” usa la cámara nativa (atributo <code>capture=\"environment\"</code>). Apuntá SOLO al bloque de ingredientes para mejor OCR.</p>
+          <p>Tip: en iPhone el botón “Tomar foto” usa la cámara trasera (<code>capture="environment"</code>). Apuntá SOLO al bloque de ingredientes para mejor OCR.</p>
         </footer>
       </div>
     </div>
   );
 }
 
-/* -------- helpers -------- */
-
+/* helpers */
 function fileToDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -335,7 +322,6 @@ function fileToDataURL(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
-
 function resizeImageDataUrl(dataUrl: string, maxW: number): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
