@@ -2,10 +2,10 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-// Usamos mayormente lucide-react (estilo Feather). Si faltara algún icono puntual, se puede sumar otro set.
-import { Camera, Upload, RefreshCw, Sparkles, Info, Check, X, WheatOff, MilkOff, FileText } from 'lucide-react';
+import { Camera, Upload, RefreshCw, Sparkles, Check, X, WheatOff, MilkOff, FileText } from 'lucide-react';
 import { localAnalyze, type AnalyzeOutput } from '@/lib/analyze';
 import { ocrImageDataUrl } from '@/lib/ocr';
+import { usePullToRefresh } from '@/lib/usePullToRefresh';
 
 function scoreColor(score: number) {
   if (score >= 8) return "bg-success-500 text-white";
@@ -14,6 +14,9 @@ function scoreColor(score: number) {
 }
 
 export default function ScanCheck() {
+  // Pull-to-refresh (PWA iOS)
+  usePullToRefresh();
+
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<AnalyzeOutput>(localAnalyze(""));
@@ -75,24 +78,21 @@ export default function ScanCheck() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Entrada */}
           <section className="card p-4 md:p-6">
-            <div className="flex items-center justify-between mb-3">
+            {/* Solo título, sin subtítulo */}
+            <div className="mb-3">
               <h2 className="h2">Entrada</h2>
-              <div className="subtle inline-flex items-center gap-1">
-                <Info className="w-4 h-4" />
-                Subí o tomá una foto del bloque de ingredientes
-              </div>
             </div>
 
-            {/* Botones grandes */}
-            <div className="flex flex-wrap gap-3 mb-5">
-              <button onClick={handleTakePhoto} className="btn btn-brand rounded-2xl">
+            {/* Botones grandes centrados y parejos */}
+            <div className="flex flex-wrap justify-center items-center gap-3 mb-5">
+              <button onClick={handleTakePhoto} className="btn btn-brand rounded-2xl min-w-[160px] justify-center">
                 <Camera className="w-5 h-5" /> Tomar foto
               </button>
-              <button onClick={handleUploadPhoto} className="btn btn-outline rounded-2xl">
+              <button onClick={handleUploadPhoto} className="btn btn-outline rounded-2xl min-w-[160px] justify-center">
                 <Upload className="w-5 h-5" /> Subir foto
               </button>
               {previewDataUrl && (
-                <button onClick={resetPhoto} className="btn btn-outline rounded-2xl">
+                <button onClick={resetPhoto} className="btn btn-outline rounded-2xl min-w-[160px] justify-center">
                   <RefreshCw className="w-5 h-5" /> Tomar otra
                 </button>
               )}
