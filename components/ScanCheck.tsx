@@ -1,8 +1,8 @@
 'use client';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Sparkles, Info, ShieldAlert, CheckCircle2, XCircle, WheatOff, MilkOff } from 'lucide-react';
-import { localAnalyze, AnalyzeOutput } from '@/lib/analyze';
+import { Camera, Sparkles, Info, ShieldAlert, CheckCircle2, XCircle, WheatOff, MilkOff, Upload, RefreshCw } from 'lucide-react';
+import { localAnalyze, type AnalyzeOutput } from '@/lib/analyze';
 
 const panel = "bg-stone-100 border border-stone-300 rounded-2xl shadow-sm";
 const heading = "text-stone-800 font-semibold";
@@ -52,30 +52,6 @@ function Badge({ icon: Icon, text }: { icon: any; text: string }) {
   );
 }
 
-function useCamera(streamOn: boolean) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    (async () => {
-      if (!streamOn) return;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch (e) {
-        console.warn("Camera error", e);
-      }
-    })();
-    return () => { if (stream) stream.getTracks().forEach((t) => t.stop()); };
-  }, [streamOn]);
-  return { videoRef };
-}
-
 async function callAnalyzeAPI(payload: { imageBase64?: string; text?: string }): Promise<AnalyzeOutput | null> {
   try {
     const res = await fetch("/api/analyze", {
@@ -93,50 +69,60 @@ async function callAnalyzeAPI(payload: { imageBase64?: string; text?: string }):
 }
 
 export default function ScanCheck() {
+  const [useVision, setUseVision] = useState(true); // ON = manda la foto a /api/analyze
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<AnalyzeOutput>(localAnalyze(""));
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Demo manual
   const [demoKey, setDemoKey] = useState<keyof typeof DEMO_PRODUCTS>("granola");
   const [manualText, setManualText] = useState(DEMO_PRODUCTS["granola"].text);
-  const [liveMode, setLiveMode] = useState(false);
-  const { videoRef } = useCamera(liveMode);
-  const [result, setResult] = useState<AnalyzeOutput>(localAnalyze(DEMO_PRODUCTS["granola"].text));
-  const [busy, setBusy] = useState(false);
-  const [useVision, setUseVision] = useState(true); // toggle to send frames to /api/analyze
 
-  // Take frame and send to API (Vision)
-  useEffect(() => {
-    if (!liveMode || !useVision) return;
-    let id: any;
-    const capture = async () => {
-      try {
-        const v = videoRef.current;
-        if (!v) return;
-        const cvs = document.createElement("canvas");
-        const w = v.videoWidth;
-        const h = v.videoHeight;
-        if (!w || !h) return;
-        cvs.width = Math.min(640, w);
-        cvs.height = Math.floor((cvs.width / w) * h);
-        const ctx = cvs.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(v, 0, 0, cvs.width, cvs.height);
-        const dataUrl = cvs.toDataURL("image/jpeg", 0.8);
-        const base64 = dataUrl.split(",")[1];
-        setBusy(true);
-        const analyzed = await callAnalyzeAPI({ imageBase64: base64 });
-        if (analyzed) setResult(analyzed);
-      } finally {
-        setBusy(false);
-      }
-    };
-    // poll every 2.5s to avoid hammering the API
-    id = setInterval(capture, 2500);
-    return () => clearInterval(id);
-  }, [liveMode, useVision]);
+  const handleSelectDemo = (k: keyof typeof DEMO_PRODUCTS) => {
+    setDemoKey(k);
+    setManualText(DEMO_PRODUCTS[k].text);
+    const analyzed = localAnalyze(DEMO_PRODUCTS[k].text);
+    setResult(analyzed);
+    setPreviewDataUrl(null);
+  };
 
-  // Manual analysis (demo)
-  useEffect(() => {
-    if (liveMode) return;
-    setResult(localAnalyze(manualText));
-  }, [manualText, liveMode]);
+  // Tomar foto (iPhone abre cámara nativa)
+  const handleTakePhoto = () => {
+    fileInputRef.current?.click();
+  };
+
+  // Subir foto desde galería/archivos
+  const handleUploadPhoto = () => {
+    uploadInputRef.current?.click();
+  };
+
+  const onImagePicked = async (file: File) => {
+    // Previsualizar
+    const dataUrl = await fileToDataURL(file);
+    setPreviewDataUrl(dataUrl);
+
+    // Recortar tamaño máximo a ~1200px de ancho para menor payload
+    const resized = await resizeImageDataUrl(dataUrl, 1200);
+    const base64 = resized.split(",")[1];
+
+    if (useVision) {
+      setBusy(true);
+      const analyzed = await callAnalyzeAPI({ imageBase64: base64 });
+      setBusy(false);
+      if (analyzed) setResult(analyzed);
+    } else {
+      // Sin Vision: no hay OCR -> resultado neutro (o pedimos pegar texto)
+      setResult(localAnalyze(""));
+    }
+  };
+
+  const resetPhoto = () => {
+    setPreviewDataUrl(null);
+    setResult(localAnalyze(""));
+  };
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-800">
@@ -148,39 +134,85 @@ export default function ScanCheck() {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl font-bold text-stone-800">Scan&Check</h1>
-              <p className="text-sm text-stone-500">Gluten & Lactosa — Demo listo para iPhone</p>
+              <p className="text-sm text-stone-500">Gluten & Lactosa — Foto única (estable)</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <label className="text-xs text-stone-500 flex items-center gap-1">
               <input type="checkbox" checked={useVision} onChange={e => setUseVision(e.target.checked)} />
               Usar Vision API
             </label>
-            <button onClick={() => setLiveMode(v => !v)}
-              className={`px-3 py-2 rounded-xl border ${liveMode ? "bg-green-600 text-white border-green-700" : "bg-stone-100 text-stone-700 border-stone-300"}`}>
-              <span className="inline-flex items-center gap-2">
-                <Camera className="w-4 h-4" /> {liveMode ? "Cámara activa" : "Activar cámara"}
-              </span>
-            </button>
           </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Izquierda: Foto + Demo */}
           <section className={`${panel} p-4 md:p-6`}>
             <div className="flex items-center justify-between mb-3">
               <h2 className={`${heading}`}>Entrada</h2>
               <div className="flex items-center gap-2 text-xs">
-                <Badge icon={Info} text={liveMode ? "OCR (Vision) desde cámara" : "Texto de etiqueta (demo)"} />
+                <Badge icon={Info} text="Subí o tomá una foto del bloque de ingredientes" />
               </div>
             </div>
 
-            <div className={`overflow-hidden rounded-2xl border ${liveMode ? "border-green-600" : "border-stone-300"}`}>
+            {/* Controles de foto */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={handleTakePhoto}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300"
+              >
+                <Camera className="w-4 h-4" /> Tomar foto
+              </button>
+              <button
+                onClick={handleUploadPhoto}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-stone-100 text-stone-800 border-stone-300"
+              >
+                <Upload className="w-4 h-4" /> Subir foto
+              </button>
+              {previewDataUrl && (
+                <button
+                  onClick={resetPhoto}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border bg-white text-stone-700 border-stone-300"
+                >
+                  <RefreshCw className="w-4 h-4" /> Tomar otra
+                </button>
+              )}
+            </div>
+
+            {/* Inputs ocultos para iPhone */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"  // iPhone abre cámara trasera
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) await onImagePicked(f);
+              }}
+            />
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) await onImagePicked(f);
+              }}
+            />
+
+            {/* Preview de foto */}
+            <div className={`overflow-hidden rounded-2xl border ${previewDataUrl ? "border-green-600" : "border-stone-300"}`}>
               <div className="relative aspect-video bg-stone-200 flex items-center justify-center">
-                {liveMode ? (
-                  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                {previewDataUrl ? (
+                  // Mostramos la foto elegida
+                  <img src={previewDataUrl} alt="foto etiqueta" className="w-full h-full object-contain" />
                 ) : (
                   <div className="p-6 text-center space-y-3">
-                    <p className="text-stone-600">Cámara desactivada — usá el modo demo para probar.</p>
+                    <p className="text-stone-600">
+                      Tomá o subí una foto del <span className="font-medium">bloque de ingredientes / alergénos</span>.
+                    </p>
                     <div className="flex gap-2 items-center justify-center text-xs">
                       <Badge icon={WheatOff} text="Detecta gluten" />
                       <Badge icon={MilkOff} text="Detecta lactosa" />
@@ -190,40 +222,39 @@ export default function ScanCheck() {
               </div>
             </div>
 
-            {!liveMode && (
-              <div className="mt-4 grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm">Elegí un producto de ejemplo</label>
-                  <select className="w-full border border-stone-300 bg-stone-100 rounded-xl px-3 py-2"
-                    value={demoKey}
-                    onChange={(e) => {
-                      const k = e.target.value as keyof typeof DEMO_PRODUCTS;
-                      const t = DEMO_PRODUCTS[k].text;
-                      setDemoKey(k);
-                      setManualText(t);
-                    }}>
-                    {Object.entries(DEMO_PRODUCTS).map(([key, v]) => (
-                      <option key={key} value={key}>{v.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm">Texto de etiqueta / ingredientes</label>
-                  <textarea className="w-full h-40 border border-stone-300 bg-white rounded-xl p-3 text-sm"
-                    placeholder="Pegá acá la lista de ingredientes o info de la etiqueta..."
-                    value={manualText}
-                    onChange={(e) => setManualText(e.target.value)} />
-                </div>
+            {/* Modo demo por texto */}
+            <div className="mt-4 grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm">Producto de ejemplo</label>
+                <select
+                  className="w-full border border-stone-300 bg-stone-100 rounded-xl px-3 py-2"
+                  value={demoKey}
+                  onChange={(e) => handleSelectDemo(e.target.value as keyof typeof DEMO_PRODUCTS)}
+                >
+                  {Object.entries(DEMO_PRODUCTS).map(([key, v]) => (
+                    <option key={key} value={key}>{v.label}</option>
+                  ))}
+                </select>
               </div>
-            )}
+              <div className="space-y-2">
+                <label className="text-sm">Texto de etiqueta / ingredientes (demo)</label>
+                <textarea
+                  className="w-full h-40 border border-stone-300 bg-white rounded-xl p-3 text-sm"
+                  placeholder="Pegá acá la lista de ingredientes…"
+                  value={manualText}
+                  onChange={(e) => {
+                    setManualText(e.target.value);
+                    setPreviewDataUrl(null);
+                    setResult(localAnalyze(e.target.value));
+                  }}
+                />
+              </div>
+            </div>
 
-            {liveMode && (
-              <div className="mt-3 text-xs text-stone-500">
-                {busy ? "Analizando..." : "En espera de nuevo cuadro..."}
-              </div>
-            )}
+            {busy && <div className="mt-3 text-xs text-stone-500">Analizando foto…</div>}
           </section>
 
+          {/* Derecha: Resultados */}
           <section className={`${panel} p-4 md:p-6`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className={`${heading}`}>Resultado del análisis</h2>
@@ -239,13 +270,23 @@ export default function ScanCheck() {
                 <span className="text-lg font-semibold text-stone-800">{result.score}/10</span>
               </div>
               <div className="w-full h-3 bg-stone-200 rounded-full mt-2 overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${(result.score / 10) * 100}%` }} transition={{ type: "spring", stiffness: 120, damping: 18 }} className="h-full bg-green-600" />
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(result.score / 10) * 100}%` }}
+                  transition={{ type: "spring", stiffness: 120, damping: 18 }}
+                  className="h-full bg-green-600"
+                />
               </div>
             </div>
 
             <AnimatePresence mode="popLayout">
-              <motion.div key={result.summary} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-                className="rounded-xl bg-amber-100 border border-amber-300 p-3 text-sm text-amber-900 mb-4">
+              <motion.div
+                key={result.summary}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="rounded-xl bg-amber-100 border border-amber-300 p-3 text-sm text-amber-900 mb-4"
+              >
                 {result.summary}
               </motion.div>
             </AnimatePresence>
@@ -268,33 +309,41 @@ export default function ScanCheck() {
                 ) : (<p className="text-sm text-stone-500">Sin contras destacadas.</p>)}
               </div>
             </div>
-
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-2xl bg-stone-100 border border-stone-300 p-4">
-                <h4 className="font-medium text-stone-800 mb-1">Gluten</h4>
-                {result.hasGluten ? (
-                  <p className="text-sm text-stone-700">Detectado. Origen probable: <span className="font-medium">{result.glutenOrigin || "no especificado"}</span>.</p>
-                ) : result.crossContam ? (
-                  <p className="text-sm text-stone-700">Sin gluten en ingredientes, pero <span className="font-medium">riesgo de contaminación cruzada</span>.</p>
-                ) : (
-                  <p className="text-sm text-stone-700">No se detectó gluten.</p>
-                )}
-              </div>
-              <div className="rounded-2xl bg-stone-100 border border-stone-300 p-4">
-                <h4 className="font-medium text-stone-800 mb-1">Lactosa</h4>
-                {result.hasLactose ? (
-                  <p className="text-sm text-stone-700">Detectada lactosa o derivados lácteos.</p>
-                ) : (<p className="text-sm text-stone-700">No se detectó lactosa.</p>)}
-              </div>
-            </div>
-
           </section>
         </div>
 
         <footer className="mt-8 text-xs text-stone-500">
-          <p>Para producción: configurá <code>OPENAI_API_KEY</code> y serví por HTTPS para que iOS habilite la cámara.</p>
+          <p>Tip: en iPhone el botón “Tomar foto” usa la cámara nativa (atributo <code>capture=\"environment\"</code>). Apuntá SOLO al bloque de ingredientes para mejor OCR.</p>
         </footer>
       </div>
     </div>
   );
+}
+
+/* -------- helpers -------- */
+
+function fileToDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function resizeImageDataUrl(dataUrl: string, maxW: number): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = dataUrl;
+  });
 }
