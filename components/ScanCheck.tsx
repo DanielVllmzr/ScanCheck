@@ -109,14 +109,19 @@ export default function ScanCheck() {
     const base64 = resized.split(",")[1];
 
     if (useVision) {
-      setBusy(true);
-      const analyzed = await callAnalyzeAPI({ imageBase64: base64 });
-      setBusy(false);
-      if (analyzed) setResult(analyzed);
-    } else {
-      // Sin Vision: no hay OCR -> resultado neutro (o pedimos pegar texto)
-      setResult(localAnalyze(""));
+  setBusy(true);
+  const analyzed = await callAnalyzeAPI({ imageBase64: base64 });
+  setBusy(false);
+  if (analyzed) {
+    if ((analyzed as any).error) {
+      alert("⚠️ Error Vision: " + (analyzed as any).error);
+      console.log("🔎 Vision API error:", analyzed);
     }
+    setResult(analyzed);
+  }
+} else {
+  setResult(localAnalyze(""));
+}
   };
 
   const resetPhoto = () => {
