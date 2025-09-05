@@ -1,39 +1,51 @@
-// lib/usePullToRefresh.ts
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
- * Activa un pull-to-refresh simple en PWAs iOS:
- * - Solo activa si scroll está arriba del todo (scrollY === 0).
- * - Si el usuario arrastra hacia abajo > 70px, se recarga la página.
+ * Pull-to-refresh con progreso para PWAs en iOS (y navegadores sin gesto nativo).
+ * - Solo actúa si estás scrolleado en el tope (scrollY === 0).
+ * - Devuelve progreso (0..1) e isPulling para que puedas mostrar un indicador.
+ * - Hace reload cuando el delta supera el threshold (por defecto 70px).
  */
 export function usePullToRefresh(threshold = 70) {
-  useEffect(() => {
-    let startY = 0;
-    let pulling = false;
+  const [progress, setProgress] = useState(0);   // 0..1
+  const [isPulling, setIsPulling] = useState(false);
+  const reloadingRef = useRef(false);
+  const startYRef = useRef(0);
 
+  useEffect(() => {
     const onTouchStart = (e: TouchEvent) => {
       if (window.scrollY === 0) {
-        startY = e.touches[0].clientY;
-        pulling = true;
+        startYRef.current = e.touches[0].clientY;
+        setIsPulling(true);
+        setProgress(0);
       } else {
-        pulling = false;
+        setIsPulling(false);
+        setProgress(0);
       }
     };
 
     const onTouchMove = (e: TouchEvent) => {
-      if (!pulling) return;
-      const delta = e.touches[0].clientY - startY;
-      // si baja hacia abajo y supera threshold => refrescamos
-      if (delta > threshold) {
-        pulling = false;
-        // pequeña vibración (si está disponible)
+      if (!isPulling) return;
+      const delta = e.touches[0].clientY - startYRef.current;
+      if (delta <= 0) {
+        setProgress(0);
+        return;
+      }
+      const p = Math.min(delta / threshold, 1);
+      setProgress(p);
+
+      // Si superó el umbral, recargamos con un pequeño delay para que se vea el snap final
+      if (p >= 1 && !reloadingRef.current) {
+        reloadingRef.current = true;
         try { (navigator as any).vibrate?.(10); } catch {}
-        // recargar
-        location.reload();
+        setTimeout(() => location.reload(), 180);
       }
     };
 
-    const onTouchEnd = () => { pulling = false; };
+    const onTouchEnd = () => {
+      setIsPulling(false);
+      setProgress(0);
+    };
 
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: true });
@@ -44,5 +56,7 @@ export function usePullToRefresh(threshold = 70) {
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
     };
-  }, [threshold]);
+  }, [isPulling, threshold]);
+
+  return { progress, isPulling };
 }
