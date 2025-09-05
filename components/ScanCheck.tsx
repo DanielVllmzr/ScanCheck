@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import Image from 'next/image';
+import NextImage from 'next/image'; // 👈 renombrado para no chocar con new Image()
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera,
@@ -100,9 +100,9 @@ export default function ScanCheck() {
         {/* Header */}
         <header className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            {/* Logo sin fondo, sobre el fondo existente (sin círculo) */}
+            {/* Logo sin fondo (NextImage) */}
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-inner border border-border bg-transparent">
-              <Image
+              <NextImage
                 src="/logo-transparent.png"
                 alt="Scan&Check"
                 width={28}
@@ -121,7 +121,6 @@ export default function ScanCheck() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Entrada */}
           <section className="card p-4 md:p-6">
-            {/* Solo título, sin subtítulo */}
             <div className="mb-3">
               <h2 className="h2">Entrada</h2>
             </div>
@@ -337,7 +336,7 @@ function fileToDataURL(file: File): Promise<string> {
 }
 function resizeImageDataUrl(dataUrl: string, maxW: number): Promise<string> {
   return new Promise((resolve) => {
-    const img = new Image();
+    const img = new window.Image(); // 👈 usar el constructor del navegador
     img.onload = () => {
       const scale = Math.min(1, maxW / img.width);
       const w = Math.round(img.width * scale);
