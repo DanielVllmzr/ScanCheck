@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Upload, RefreshCw, Sparkles, Check, X, WheatOff, MilkOff, FileText } from 'lucide-react';
+import { Camera, Upload, RefreshCw, RefreshCcw, Sparkles, Check, X, WheatOff, MilkOff, FileText } from 'lucide-react';
 import { localAnalyze, type AnalyzeOutput } from '@/lib/analyze';
 import { ocrImageDataUrl } from '@/lib/ocr';
 import { usePullToRefresh } from '@/lib/usePullToRefresh';
@@ -14,8 +14,9 @@ function scoreColor(score: number) {
 }
 
 export default function ScanCheck() {
-  // Pull-to-refresh (PWA iOS)
-  usePullToRefresh();
+ // Pull-to-refresh (PWA iOS) con progreso
+const { progress, isPulling } = usePullToRefresh();
+
 
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -60,6 +61,31 @@ export default function ScanCheck() {
 
   return (
     <div className="min-h-screen">
+      {/* Indicador pull-to-refresh (flecha mostaza) */}
+<AnimatePresence>
+  {(isPulling || progress > 0) && (
+    <motion.div
+      initial={{ opacity: 0, y: -16, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -16, scale: 0.9 }}
+      className="fixed top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+    >
+      <div className="flex items-center gap-2 bg-brand-500 text-white rounded-full px-3 py-1.5 shadow-soft border border-brand-600/30">
+        <motion.span
+          style={{ display: "inline-flex" }}
+          animate={{ rotate: progress * 360 }}
+          transition={{ type: "tween", ease: "linear", duration: 0 }}
+        >
+          <RefreshCcw className="w-4 h-4" />
+        </motion.span>
+        <span className="text-xs font-medium">
+          {progress < 1 ? "Deslizá para refrescar" : "Soltá para recargar"}
+        </span>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
       <div className="max-w-6xl mx-auto p-4 md:p-8">
         {/* Header */}
         <header className="flex items-center justify-between mb-6">
